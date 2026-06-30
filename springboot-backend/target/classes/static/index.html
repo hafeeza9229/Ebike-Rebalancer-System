@@ -1,0 +1,1681 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-zinc-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VeloOps — E-Bike Fleet Operations</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .mono-text {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f4f4f5;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d4d4d8;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1aa;
+        }
+    </style>
+</head>
+<body class="h-full text-zinc-900 flex flex-col">
+
+    <!-- AUTHENTICATION VIEW -->
+    <div id="auth-container" class="hidden min-h-screen bg-zinc-50 flex flex-col justify-center items-center p-6">
+        <div class="w-full max-w-sm">
+            <div class="bg-white p-8 rounded-xl shadow-sm border border-zinc-200">
+                <div class="mb-4 text-center">
+                    <h2 class="text-2xl font-bold tracking-tight text-zinc-900" id="auth-title">VeloOps Login</h2>
+                    <p class="text-xs text-zinc-500 mt-1" id="auth-subtitle">E-Bike Fleet Management Control System</p>
+                </div>
+
+                <!-- SEGMENTED ROLE TOGGLE BUTTONS -->
+                <div class="flex p-1 bg-zinc-100 rounded-lg mb-5 text-xs font-semibold select-none">
+                    <button type="button" id="role-tab-user" onclick="setLoginRole('USER')" class="flex-1 py-1.5 text-center rounded-md transition-all bg-white text-zinc-900 shadow-sm border border-transparent">
+                        End-User Portal
+                    </button>
+                    <button type="button" id="role-tab-admin" onclick="setLoginRole('ADMIN')" class="flex-1 py-1.5 text-center rounded-md transition-all text-zinc-500 hover:text-zinc-800">
+                        Admin Console
+                    </button>
+                </div>
+
+                <div id="auth-alert" class="hidden mb-4 p-3 rounded text-xs"></div>
+
+                <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+                    <!-- Name Input (Register Only) -->
+                    <div id="name-group" class="hidden mb-4">
+                        <label for="reg-name" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Full Name</label>
+                        <input type="text" id="reg-name" class="w-full px-3 py-2 border border-zinc-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900" placeholder="John Doe">
+                    </div>
+
+                    <!-- Email Input -->
+                    <div class="mb-4">
+                        <label for="auth-email" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Email Address</label>
+                        <input type="email" id="auth-email" required class="w-full px-3 py-2 border border-zinc-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900" placeholder="user@ebike.com">
+                    </div>
+
+                    <!-- Password Input -->
+                    <div class="mb-4">
+                        <label for="auth-password" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1.5">Password</label>
+                        <input type="password" id="auth-password" required class="w-full px-3 py-2 border border-zinc-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-zinc-900" placeholder="••••••••">
+                    </div>
+
+                    <!-- Sign-in Hint text -->
+                    <p id="auth-role-hint" class="text-[11px] text-zinc-500 mb-5 leading-normal bg-zinc-50 p-2.5 rounded border border-zinc-150">
+                        Renter entry. View locations, live status, and perform Rent/Return trials. Seed user: <strong class="text-zinc-700">user@ebike.com / user123</strong>
+                    </p>
+
+                    <button type="submit" id="auth-submit-btn" class="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-sm font-medium transition-colors">
+                        Sign In
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center text-xs text-zinc-500">
+                    <span id="auth-toggle-text">Need an operator account?</span>
+                    <button type="button" onclick="toggleAuthMode()" class="text-zinc-900 font-semibold underline ml-1 cursor-pointer">
+                        Sign Up
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- MAIN SYSTEM VIEW -->
+    <div id="app-container" class="hidden h-full flex overflow-hidden">
+        
+        <!-- SIDEBAR -->
+        <aside class="w-64 bg-zinc-900 text-zinc-300 flex flex-col justify-between shrink-0">
+            <div>
+                <!-- Brand logo -->
+                <div class="p-6 border-b border-zinc-800 flex items-center gap-3">
+                    <div class="h-6 w-6 rounded bg-white flex items-center justify-center font-bold text-zinc-950 text-xs">V</div>
+                    <div>
+                        <span class="block text-sm font-bold text-white tracking-widest uppercase">VeloOps</span>
+                        <span class="block text-[10px] text-zinc-500 font-mono tracking-widest uppercase">E-Bike Systems</span>
+                    </div>
+                </div>
+
+                <!-- Navigation links -->
+                <nav class="p-4 space-y-1">
+                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-button active w-full flex items-center gap-3 px-3 py-2 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 text-xs font-medium tracking-wide uppercase transition-colors">
+                        Status Dashboard
+                    </button>
+                    <button onclick="switchTab('stations')" id="nav-stations" class="nav-button w-full flex items-center gap-3 px-3 py-2 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 text-xs font-medium tracking-wide uppercase transition-colors">
+                        Station List
+                    </button>
+                    <button onclick="switchTab('vehicles')" id="nav-vehicles" class="nav-button w-full flex items-center gap-3 px-3 py-2 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 text-xs font-medium tracking-wide uppercase transition-colors">
+                        Vehicle Fleet
+                    </button>
+                    <button onclick="switchTab('operations')" id="nav-operations" class="nav-button admin-only w-full flex items-center gap-3 px-3 py-2 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 text-xs font-medium tracking-wide uppercase transition-colors">
+                        System Rebalance
+                    </button>
+                    <button onclick="switchTab('analytics')" id="nav-analytics" class="nav-button admin-only w-full flex items-center gap-3 px-3 py-2 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 text-xs font-medium tracking-wide uppercase transition-colors">
+                        Fleet Analytics
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Operator session panel -->
+            <div class="p-4 border-t border-zinc-800 text-xs flex flex-col gap-2">
+                <div>
+                    <span class="block text-zinc-500 uppercase font-bold tracking-wider text-[9px]">Logged Session</span>
+                    <span id="session-name" class="block font-medium text-white truncate">Operator</span>
+                    <span id="session-role" class="block text-[10px] text-zinc-400 font-mono tracking-wider uppercase">ROLE_STAFF</span>
+                </div>
+                <button onclick="handleLogout()" class="mt-2 w-full py-1.5 border border-zinc-700 hover:bg-zinc-800 hover:text-white rounded text-[10px] uppercase font-bold tracking-wider transition-colors">
+                    Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN LAYOUT AREA -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+            
+            <!-- TOP STATS BAR -->
+            <header class="h-16 border-b border-zinc-200 bg-white flex justify-between items-center px-8 shrink-0">
+                <div>
+                    <h1 id="view-title" class="text-sm font-semibold text-zinc-900 tracking-wide uppercase">Operational Supervisor View</h1>
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <!-- Dynamic mini alert system -->
+                    <div id="topbar-status-badge" class="flex items-center gap-2 px-3 py-1 bg-zinc-50 border border-zinc-200 rounded text-xs font-medium text-zinc-700">
+                        <span id="topbar-status-dot" class="h-2 w-2 rounded-full bg-zinc-400"></span>
+                        <span id="topbar-status-text">Fleet Checking</span>
+                    </div>
+
+                    <button onclick="fetchLatestData()" class="px-3 py-1 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 rounded text-xs transition-colors">
+                        Refresh
+                    </button>
+                </div>
+            </header>
+
+            <!-- SCRAPE PANELS CONTAINER (SCROLLABLE) -->
+            <div class="flex-grow overflow-y-auto p-8" id="content-views">
+
+                <!-- DASHBOARD VIEW -->
+                <section id="view-dashboard" class="space-y-6">
+                    <!-- ACTIVE RENTAL TRIP PANEL -->
+                    <div id="active-rental-container" class="hidden bg-zinc-950 text-white p-6 rounded-xl border border-zinc-805 shadow-md space-y-4 transition-all">
+                        <div class="flex justify-between items-start lg:items-center flex-col lg:flex-row gap-4">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="relative flex h-2 w-2">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    <span class="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Rental Trip in Progress</span>
+                                </div>
+                                <h3 id="active-vehicle-label" class="text-base font-extrabold mt-1 tracking-tight text-white">⚡ EBike UNIT-UNKNOWN</h3>
+                                <p class="text-xs text-zinc-400 mt-0.5">Departed from <span id="active-origin-station" class="text-zinc-200 font-semibold underline decoration-zinc-700">-</span></p>
+                            </div>
+                            <!-- Live trip metrics -->
+                            <div class="flex items-center gap-8 shrink-0">
+                                <div>
+                                    <span class="block text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Ride Duration</span>
+                                    <span id="active-ride-duration" class="text-xl font-bold font-mono text-zinc-100">00:00</span>
+                                </div>
+                                <div class="border-l border-zinc-800 pl-8">
+                                    <span class="block text-[9px] uppercase font-bold text-zinc-500 tracking-wider">Estimated Battery Charge</span>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <div class="w-8 bg-zinc-800 h-2.5 rounded border border-zinc-700 p-0.5 overflow-hidden">
+                                            <div id="active-battery-bar" class="bg-emerald-400 h-full rounded-xs" style="width: 80%"></div>
+                                        </div>
+                                        <span id="active-battery-text" class="text-xs font-mono font-bold text-emerald-400">80%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Drop-off Controls -->
+                        <div class="pt-4 border-t border-zinc-900 flex justify-between items-center flex-wrap gap-4">
+                            <div class="space-y-1">
+                                <label for="return-docking-select" class="block text-[9px] font-bold uppercase tracking-wider text-zinc-500">Select Return Station Node</label>
+                                <select id="return-docking-select" class="bg-zinc-900 border border-zinc-800 text-xs text-zinc-200 py-1.5 px-3 rounded focus:outline-none focus:ring-1 focus:ring-zinc-700 max-w-xs transition-shadow">
+                                    <!-- Populated dynamically with station lists -->
+                                </select>
+                            </div>
+                            <button onclick="terminateActiveRentalTrip()" class="px-4 py-2 bg-emerald-400 hover:bg-emerald-300 text-zinc-950 font-bold tracking-wide rounded text-xs uppercase transition-colors">
+                                End Ride & Lock Bike
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- KPI Cards -->
+                    <div class="grid grid-cols-4 gap-4">
+                        <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
+                            <span class="block text-xs font-semibold text-zinc-400 uppercase tracking-widest">Active Stations</span>
+                            <span id="kpi-total-stations" class="block text-3xl font-bold mt-2 mono-text text-zinc-900">-</span>
+                            <p class="text-[11px] text-zinc-400 mt-1">Supervised docking ports</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
+                            <span class="block text-xs font-semibold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                                Rebalance Needed
+                            </span>
+                            <span id="kpi-rebalance-needed" class="block text-3xl font-bold mt-2 mono-text text-zinc-900">-</span>
+                            <p class="text-[11px] text-zinc-400 mt-1">Depleted or critically low</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
+                            <span class="block text-xs font-semibold text-zinc-400 uppercase tracking-widest">Operational Fleet</span>
+                            <span id="kpi-total-vehicles" class="block text-3xl font-bold mt-2 mono-text text-zinc-900">-</span>
+                            <p class="text-[11px] text-zinc-400 mt-1">Both e-bikes and manual assets</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm">
+                            <span class="block text-xs font-semibold text-zinc-400 uppercase tracking-widest">Cumulative Fuel Saved</span>
+                            <span id="kpi-fuel-saved" class="block text-3xl font-bold mt-2 mono-text text-zinc-900">-</span>
+                            <p class="text-[11px] text-zinc-400 mt-1">Liters from electric rebalancing</p>
+                        </div>
+                    </div>
+
+                    <!-- Row of core summary panels -->
+                    <div class="grid grid-cols-3 gap-6">
+                        <!-- Critical Operations Panel -->
+                        <div class="col-span-1 bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <h3 id="dashboard-sidebar-title" class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Crucial Tasks</h3>
+                            
+                            <div class="space-y-3" id="dashboard-incident-list">
+                                <!-- Dynamic item -->
+                            </div>
+                        </div>
+
+                        <!-- Main Station Overview Dashboard Summary -->
+                        <div class="col-span-2 bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Docking Station Real-Time Overview</h3>
+                                <button onclick="switchTab('stations')" class="text-xs text-zinc-900 underline font-medium">View detailed lists</button>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs text-zinc-500">
+                                    <thead class="text-zinc-600 uppercase border-b border-zinc-100 font-bold">
+                                        <tr>
+                                            <th class="py-3 px-2">Station</th>
+                                            <th class="py-3 px-2">Location</th>
+                                            <th class="py-3 px-2">E-Bike Fleet Status</th>
+                                            <th id="th-quick-actions" class="py-3 px-2 text-right">Quick Rent / Return</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashboard-stations-tbody">
+                                        <!-- Dynamic station rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- STATION LIST VIEW -->
+                <section id="view-stations" class="hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Managed Stations</h3>
+                                <p class="text-xs text-zinc-500">Adjust max capacity or construct custom network hub nodes</p>
+                            </div>
+                            <button id="add-station-btn" onclick="openStationModal()" class="admin-only px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs transition-colors font-medium">
+                                Create Station Node
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-zinc-50 border-y border-zinc-200 text-zinc-600 uppercase font-semibold">
+                                    <tr>
+                                        <th class="py-3 px-4 text-zinc-550">Node Location ID</th>
+                                        <th class="py-3 px-4">Station Name</th>
+                                        <th class="py-3 px-4">Address Coordinates</th>
+                                        <th class="py-3 px-4">Current Bikes</th>
+                                        <th class="py-3 px-4">Max Capacity</th>
+                                        <th class="py-3 px-4">Rebalancing Alerts</th>
+                                        <th class="py-3 px-4 text-right admin-only">Administrative Commands</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stations-list-tbody" class="divide-y divide-zinc-200">
+                                    <!-- Dynamic elements from server -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- VEHICLES VIEW -->
+                <section id="view-vehicles" class="hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Vehicle Fleet Directory</h3>
+                                <p class="text-xs text-zinc-500">Configure status values or register next-generation e-bike units</p>
+                            </div>
+                            <button id="add-vehicle-btn" onclick="openVehicleModal()" class="admin-only px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs transition-colors font-medium">
+                                Register Vehicle
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-zinc-50 border-y border-zinc-200 text-zinc-600 uppercase font-semibold">
+                                    <tr>
+                                        <th class="py-3 px-4">Asset ID</th>
+                                        <th class="py-3 px-4">Vehicle Propulsion Type</th>
+                                        <th class="py-3 px-4">Assigned Location</th>
+                                        <th class="py-3 px-4">Battery Level</th>
+                                        <th class="py-3 px-4">Maintenance Cost</th>
+                                        <th class="py-3 px-4">Operational Status</th>
+                                        <th class="py-3 px-4 text-right admin-only">Supervisor Panel Controls</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vehicles-list-tbody" class="divide-y divide-zinc-200">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- SYSTEM REBALANCE VIEW -->
+                <section id="view-operations" class="hidden space-y-6">
+                    <div class="grid grid-cols-3 gap-6">
+                        <!-- Left trigger card -->
+                        <div class="col-span-1 bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-6 flex flex-col justify-between">
+                            <div class="space-y-4">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Automated Route Optimization</h3>
+                                <p class="text-xs text-zinc-500 leading-relaxed">
+                                    Trigger a rebalancing action. The optimized system calculates path vectors from overpopulated hubs directly to critical docks under 20% capacity.
+                                </p>
+                                
+                                <div class="p-4 bg-zinc-50 rounded border border-zinc-200 text-xs space-y-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-zinc-500 font-medium">Overcapacity Sources:</span>
+                                        <span class="font-semibold text-zinc-800" id="rebalance-op-sources">-</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-zinc-500 font-medium">Depleted Outlets:</span>
+                                        <span class="font-semibold text-red-600" id="rebalance-op-depleted">-</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onclick="triggerRebalancingRoutine()" class="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-sm font-medium transition-colors">
+                                Trigger Rebalance
+                            </button>
+                        </div>
+
+                        <!-- Right history log list -->
+                        <div class="col-span-2 bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Rebalance Log Archives</h3>
+                                <a href="/api/export/stations/csv" target="_blank" class="px-2 py-1 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 text-zinc-700 rounded text-xs tracking-wide transition-colors">
+                                    Export Station CSV
+                                </a>
+                            </div>
+
+                            <div class="space-y-3 overflow-y-auto max-h-[300px]" id="rebalance-logs-container">
+                                <!-- Rebalance Log Card items -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- ANALYTICS VIEW -->
+                <section id="view-analytics" class="hidden space-y-6">
+                    <!-- General chart components powered by Chart.js -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Docking Station Occupancy Levels</h3>
+                            <div class="h-64 relative">
+                                <canvas id="chart-occupancy"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm space-y-4">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Vehicle Deployment Allocation</h3>
+                            <div class="h-64 relative">
+                                <canvas id="chart-vehicles"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+
+            </div>
+        </main>
+    </div>
+
+
+    <!-- STATION CREATE/UPDATE MODAL DIALOG -->
+    <div id="station-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-lg border border-zinc-200 max-w-sm w-full p-6 space-y-4">
+            <h3 id="station-modal-title" class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Station Node Details</h3>
+            <form id="station-modal-form" onsubmit="submitStationForm(event)" class="space-y-4">
+                <input type="hidden" id="station-id">
+                
+                <div>
+                    <label for="station-name-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Station Name</label>
+                    <input type="text" id="station-name-input" required class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none" placeholder="Defense Plaza">
+                </div>
+
+                <div>
+                    <label for="station-location-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Location Coordinates</label>
+                    <input type="text" id="station-location-input" required class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none" placeholder="Sector 4 Marine Drive">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label for="station-current-bikes-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Current Bikes</label>
+                        <input type="number" id="station-current-bikes-input" required min="0" defaultValue="5" class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none">
+                    </div>
+                    <div>
+                        <label for="station-capacity-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Max Capacity</label>
+                        <input type="number" id="station-capacity-input" required min="1" defaultValue="15" class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-zinc-100">
+                    <button type="button" onclick="closeStationModal()" class="px-3 py-1.5 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded text-xs font-medium">Cancel</button>
+                    <button type="submit" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-medium">Save Block</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- VEHICLE MODAL DIALOG -->
+    <div id="vehicle-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-lg border border-zinc-200 max-w-sm w-full p-6 space-y-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-zinc-700">Register E-Bike/Cycle Unit</h3>
+            <form id="vehicle-modal-form" onsubmit="submitVehicleForm(event)" class="space-y-4">
+                <div>
+                    <label for="vehicle-type-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Propulsion Class</label>
+                    <select id="vehicle-type-input" class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none">
+                        <option value="EBike">E-Bike (Electric Assisted)</option>
+                        <option value="ManualBike">Manual Cycle (Standard-Build)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="vehicle-location-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Assigned Docking Station</label>
+                    <select id="vehicle-location-input" class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none">
+                        <!-- Filled dynamically -->
+                    </select>
+                </div>
+
+                <div>
+                    <label for="vehicle-battery-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Initial Battery Charge (%)</label>
+                    <input type="number" id="vehicle-battery-input" required min="0" max="100" value="85" class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none">
+                </div>
+
+                <div>
+                    <label for="vehicle-status-input" class="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Operational State</label>
+                    <select id="vehicle-status-input" class="w-full px-3 py-1.5 border border-zinc-200 rounded text-xs focus:ring-1 focus:ring-zinc-900 focus:outline-none">
+                        <option value="AVAILABLE">Available</option>
+                        <option value="IN_USE">Active / In Use</option>
+                        <option value="MAINTENANCE">Maintenance / Outage</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t border-zinc-100">
+                    <button type="button" onclick="closeVehicleModal()" class="px-3 py-1.5 border border-zinc-200 text-zinc-700 hover:bg-zinc-50 rounded text-xs font-medium">Cancel</button>
+                    <button type="submit" class="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-medium">Add Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- RENTAL TRIP RECEIPT SUMMARY MODAL -->
+    <div id="receipt-modal" class="hidden fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-xl border border-zinc-200 max-w-sm w-full p-6 space-y-4">
+            <div class="text-center space-y-1">
+                <div class="mx-auto w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mb-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+                </div>
+                <h3 class="text-xs font-bold text-zinc-905 uppercase tracking-wide">Trip Completed!</h3>
+                <p class="text-xs text-zinc-500">Thank you for riding with VeloOps</p>
+            </div>
+
+            <!-- Receipt ticket format -->
+            <div class="bg-zinc-50 rounded-lg p-4 font-mono text-[11px] text-zinc-650 border border-zinc-200 border-dashed space-y-2.5">
+                <div class="flex justify-between border-b border-zinc-100 pb-2">
+                    <span class="font-bold text-zinc-800 font-mono text-[10px] tracking-wider">RECEIPT SUMMARY</span>
+                    <span id="receipt-id" class="text-zinc-500 font-mono text-[10px]">#TRIP-X</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>E-Bike Unit Rented:</span>
+                    <span id="receipt-bike-label" class="font-bold text-zinc-805">EBike #104</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Origin Station Hub:</span>
+                    <span id="receipt-origin" class="font-semibold text-zinc-700">Central Hub</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Dropoff Station Hub:</span>
+                    <span id="receipt-dropoff" class="font-semibold text-zinc-700">Saddar Metro</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>Trip Duration:</span>
+                    <span id="receipt-duration" class="font-bold text-zinc-800">12m 34s</span>
+                </div>
+                <div class="flex justify-between border-t border-zinc-100 pt-2 font-bold text-zinc-900">
+                    <span>Fare Charging:</span>
+                    <span id="receipt-amount" class="text-emerald-700 font-mono font-bold text-xs">Rs. 150</span>
+                </div>
+                <div class="text-[9px] text-zinc-400 text-center pt-2 leading-relaxed">
+                    This is a virtual transaction. E-Bike battery depleted by <span id="receipt-battery-depleted" class="font-semibold">12%</span>.
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button type="button" onclick="closeReceiptModal()" class="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded text-xs font-semibold transition-colors uppercase tracking-wider">
+                    Close & Start New Ride
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- JAVASCRIPT SYSTEM ENGINE -->
+    <script>
+        // Global variables state
+        let currentUser = null;
+        let activeTab = 'dashboard';
+        let globalStationsList = [];
+        let globalVehiclesList = [];
+        let globalHistoryList = [];
+        let selectedLoginRole = 'USER';
+
+        // Chart definitions
+        let occupancyChartInstance = null;
+        let vehiclesChartInstance = null;
+
+        // On document ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check local persistence session
+            const userStr = localStorage.getItem('veloops_user');
+            if (userStr) {
+                try {
+                    currentUser = JSON.parse(userStr);
+                    showApplicationState();
+                } catch (e) {
+                    showAuthState();
+                    setLoginRole('USER');
+                }
+            } else {
+                showAuthState();
+                setLoginRole('USER');
+            }
+        });
+
+        // Toggle Login Role (Renter vs Staff-Admin)
+        function setLoginRole(role) {
+            selectedLoginRole = role;
+            const btnUser = document.getElementById('role-tab-user');
+            const btnAdmin = document.getElementById('role-tab-admin');
+            const emailInput = document.getElementById('auth-email');
+            const passwordInput = document.getElementById('auth-password');
+            const hintText = document.getElementById('auth-role-hint');
+
+            if (!btnUser || !btnAdmin) return;
+
+            if (role === 'USER') {
+                btnUser.className = "flex-1 py-1.5 text-center rounded-md transition-all bg-white text-zinc-950 shadow-sm border border-transparent";
+                btnAdmin.className = "flex-1 py-1.5 text-center rounded-md transition-all text-zinc-500 hover:text-zinc-800";
+                
+                emailInput.value = 'user@ebike.com';
+                passwordInput.value = 'user123';
+                emailInput.placeholder = 'user@ebike.com';
+                hintText.innerHTML = `Renter entry. View locations, live status, and perform Rent/Return trials. Seed user: <strong class="text-zinc-700">user@ebike.com / user123</strong>`;
+            } else {
+                btnAdmin.className = "flex-1 py-1.5 text-center rounded-md transition-all bg-white text-zinc-950 shadow-sm border border-transparent";
+                btnUser.className = "flex-1 py-1.5 text-center rounded-md transition-all text-zinc-500 hover:text-zinc-800";
+                
+                emailInput.value = 'admin@ebike.com';
+                passwordInput.value = 'admin123';
+                emailInput.placeholder = 'admin@ebike.com';
+                hintText.innerHTML = `Administrator console. Perform rebalancing, adjust max capacity, monitor KPIs or decommission assets. Seed admin: <strong class="text-zinc-700">admin@ebike.com / admin123</strong>`;
+            }
+        }
+
+        // Toggle Auth View Mode (Login vs Register)
+        let isAuthLogin = true;
+        function toggleAuthMode() {
+            isAuthLogin = !isAuthLogin;
+            const title = document.getElementById('auth-title');
+            const toggleBtnText = document.getElementById('auth-toggle-text');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const nameGrp = document.getElementById('name-group');
+
+            if (isAuthLogin) {
+                title.textContent = 'VeloOps Login';
+                toggleBtnText.textContent = 'Need an operator account?';
+                submitBtn.textContent = 'Sign In';
+                nameGrp.classList.add('hidden');
+            } else {
+                title.textContent = 'Operator Registration';
+                toggleBtnText.textContent = 'Already have credentials?';
+                submitBtn.textContent = 'Register Now';
+                nameGrp.classList.remove('hidden');
+            }
+        }
+
+        // Show Auth Screens
+        function showAuthState() {
+            document.getElementById('auth-container').classList.remove('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+            currentUser = null;
+            localStorage.removeItem('veloops_user');
+        }
+
+        // Show Logged-In System Screens
+        function showApplicationState() {
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            
+            const role = currentUser && currentUser.role ? currentUser.role.toUpperCase() : 'USER';
+
+            // Populate operator info
+            document.getElementById('session-name').textContent = currentUser.name || currentUser.username || 'Operator';
+            document.getElementById('session-role').textContent = role === 'ADMIN' ? 'ROLE_ADMIN' : 'ROLE_USER';
+
+            // Toggle admin-only components
+            const adminOnlyElements = document.querySelectorAll('.admin-only');
+            if (role === 'ADMIN') {
+                adminOnlyElements.forEach(el => el.classList.remove('hidden'));
+            } else {
+                adminOnlyElements.forEach(el => el.classList.add('hidden'));
+            }
+
+            // Toggle quick actions header based on role
+            const actionHeader = document.getElementById('th-quick-actions');
+            if (actionHeader) {
+                if (role === 'ADMIN') {
+                    actionHeader.classList.add('hidden');
+                } else {
+                    actionHeader.classList.remove('hidden');
+                }
+            }
+
+            // Sync active rental trip representation
+            initOrResumeActiveRide();
+
+            // Run system fetches
+            fetchLatestData();
+            switchTab('dashboard');
+        }
+
+        // Handle Logout
+        function handleLogout() {
+            localStorage.removeItem('veloops_user');
+            showAuthState();
+        }
+
+        // Handle Authentication Form Submit
+        async function handleAuthSubmit(event) {
+            event.preventDefault();
+            const alertBox = document.getElementById('auth-alert');
+            alertBox.classList.add('hidden');
+
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const name = document.getElementById('reg-name').value;
+
+            const endpoint = isAuthLogin ? '/api/auth/login' : '/api/auth/register';
+            const body = isAuthLogin 
+                ? { username: email, password } 
+                : { username: email, password, name, role: selectedLoginRole };
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    throw new Error(data.error || 'Authentication operational failure.');
+                }
+
+                if (isAuthLogin) {
+                    currentUser = {
+                        username: data.username || email,
+                        name: data.name || email.split('@')[0],
+                        role: (data.role || selectedLoginRole).toUpperCase(),
+                        loggedIn: true
+                    };
+                    localStorage.setItem('veloops_user', JSON.stringify(currentUser));
+                    showApplicationState();
+                } else {
+                    // Alert success
+                    alertBox.className = 'mb-4 p-3 rounded text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 block';
+                    alertBox.textContent = 'Operator registered successfully. Please sign in now.';
+                    isAuthLogin = false;
+                    toggleAuthMode();
+                }
+
+            } catch (err) {
+                alertBox.className = 'mb-4 p-3 rounded text-xs bg-red-50 text-red-700 border border-red-200 block';
+                alertBox.textContent = err.message;
+            }
+        }
+
+        // Switch main content view tab
+        function switchTab(tabId) {
+            const role = currentUser && currentUser.role ? currentUser.role.toUpperCase() : 'USER';
+            if (role !== 'ADMIN' && (tabId === 'operations' || tabId === 'analytics')) {
+                // Ignore navigation for non-admins
+                return;
+            }
+            activeTab = tabId;
+            
+            // Toggle sidebar active highlights
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                btn.classList.remove('bg-zinc-800', 'text-white');
+                btn.classList.add('text-zinc-400');
+            });
+            const clickedBtn = document.getElementById('nav-' + tabId);
+            if (clickedBtn) {
+                clickedBtn.classList.remove('text-zinc-400');
+                clickedBtn.classList.add('bg-zinc-800', 'text-white');
+            }
+
+            // Toggle view visibility
+            const viewIds = ['dashboard', 'stations', 'vehicles', 'operations', 'analytics'];
+            viewIds.forEach(vid => {
+                document.getElementById('view-' + vid).classList.add('hidden');
+            });
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+
+            // Format View Title
+            const labels = {
+                dashboard: 'Status Dashboard',
+                stations: 'Docking Station Grid',
+                vehicles: 'Vehicle Fleet Directory',
+                operations: 'Rebalance Routing Controls',
+                analytics: 'Operational Performance Metrics'
+            };
+            document.getElementById('view-title').textContent = labels[tabId] || 'System Operator Panel';
+
+            if (tabId === 'analytics') {
+                renderAnalyticsCharts();
+            }
+        }
+
+        // Global master data fetcher aggregator
+        async function fetchLatestData() {
+            const dot = document.getElementById('topbar-status-dot');
+            const label = document.getElementById('topbar-status-text');
+
+            dot.className = 'h-2 w-2 rounded-full bg-amber-500 animate-pulse';
+            label.textContent = 'Synchronizing';
+
+            try {
+                // Fetch basic entities
+                const [resStations, resVehicles, resSummary, resHistory] = await Promise.all([
+                    fetch('/api/stations').then(r => r.json()),
+                    fetch('/api/vehicles').then(r => r.json()),
+                    fetch('/api/analytics/summary').then(r => r.json()),
+                    fetch('/api/rebalance/history').then(r => r.json())
+                ]);
+
+                globalStationsList = resStations;
+                globalVehiclesList = resVehicles;
+                globalHistoryList = resHistory;
+
+                // Sync dashboard KPIs
+                document.getElementById('kpi-total-stations').textContent = resSummary.totalStations || '0';
+                document.getElementById('kpi-rebalance-needed').textContent = resSummary.stationsNeedingRebalance ?? '0';
+                document.getElementById('kpi-total-vehicles').textContent = resSummary.totalVehicles || '0';
+                
+                const fuelSavedVal = Number(resSummary.totalFuelSaved || 0).toFixed(1);
+                document.getElementById('kpi-fuel-saved').textContent = fuelSavedVal + ' L';
+
+                // Sync sources and depleted metrics for Operations trigger tab
+                document.getElementById('rebalance-op-depleted').textContent = resSummary.stationsNeedingRebalance ?? '0';
+                
+                const highCap = globalStationsList.filter(s => (s.maxCapacity ? (s.currentBikes / s.maxCapacity) >= 0.8 : false)).length;
+                document.getElementById('rebalance-op-sources').textContent = highCap || 'Central Hub';
+
+                // Update UI renders
+                renderDashboardLeftSidebar();
+                renderDashboardStationsTable();
+                renderStationsListTable();
+                renderVehiclesListTable();
+                renderRebalanceLogs();
+
+                // Dropdowns population for modals
+                populateLocationDropdowns();
+
+                dot.className = 'h-2 w-2 rounded-full bg-emerald-500';
+                label.textContent = 'System Synchronized';
+
+            } catch (err) {
+                console.error(err);
+                dot.className = 'h-2 w-2 rounded-full bg-red-500';
+                label.textContent = 'Sync Offline';
+            }
+        }
+
+        // Render Dashboard Left Sidebar dynamically depending on role
+        function renderDashboardLeftSidebar() {
+            const role = currentUser && currentUser.role ? currentUser.role.toUpperCase() : 'USER';
+            const titleEl = document.getElementById('dashboard-sidebar-title');
+            const listEl = document.getElementById('dashboard-incident-list');
+            
+            if (!listEl) return;
+
+            if (role === 'ADMIN') {
+                if (titleEl) titleEl.textContent = "Crucial Tasks";
+                // Render incidents/rebalance alerts
+                const count = globalStationsList.filter(s => s.maxCapacity ? ((s.currentBikes / s.maxCapacity) < 0.2) : false).length;
+                renderDashboardIncidents(count);
+            } else {
+                if (titleEl) titleEl.textContent = "Your Trip History";
+                renderRenterHistory();
+            }
+        }
+
+        // Render personal renter completed logs
+        function renderRenterHistory() {
+            const listEl = document.getElementById('dashboard-incident-list');
+            if (!listEl) return;
+
+            const historyStr = localStorage.getItem('renterTripHistory');
+            let historyAry = [];
+            if (historyStr) {
+                try {
+                    historyAry = JSON.parse(historyStr);
+                } catch(e) {
+                    historyAry = [];
+                }
+            }
+
+            if (historyAry.length === 0) {
+                listEl.innerHTML = `
+                    <div class="p-4 bg-zinc-50 border border-zinc-200 rounded text-xs text-zinc-500 leading-relaxed text-center">
+                        <span class="block font-bold mb-1 uppercase tracking-wider text-[9px] text-zinc-400">Zero Trips Found</span>
+                        Your completed rental trips and digital receipts will show here as soon as you dock your first e-bike.
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = '';
+            // Sort to show newest first
+            historyAry.slice().reverse().forEach(trip => {
+                const dateFormatted = new Date(trip.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                listEl.innerHTML += `
+                    <div class="p-3 bg-zinc-50 border border-zinc-200 rounded-lg text-xs space-y-1.5 hover:shadow-sm transition-all text-left">
+                        <div class="flex justify-between items-center">
+                            <span class="font-mono text-[9px] font-bold text-zinc-400">${trip.id}</span>
+                            <span class="text-[9px] text-zinc-500">${dateFormatted}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="truncate block max-w-[80px] text-[10px] font-semibold text-zinc-800">${trip.origin}</span>
+                            <span class="text-zinc-400 text-[10px]">➔</span>
+                            <span class="truncate block max-w-[80px] text-[10px] font-semibold text-zinc-800">${trip.destination}</span>
+                        </div>
+                        <div class="text-[9px] text-zinc-500 font-medium">Auto docked: <span class="text-zinc-700">${trip.vehicleLabel}</span></div>
+                        <div class="flex justify-between items-center text-[10px] text-zinc-500 border-t border-zinc-100 pt-1.5 mt-1">
+                            <span>Duration: <strong class="text-zinc-700">${trip.duration}</strong></span>
+                            <span class="text-emerald-700 font-bold font-mono">Rs. ${trip.fare}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Render Dashboard Critical Incident alerts (no emojis)
+        function renderDashboardIncidents(count) {
+            const list = document.getElementById('dashboard-incident-list');
+            list.innerHTML = '';
+
+            if (count === 0) {
+                list.innerHTML = `
+                    <div class="p-4 bg-emerald-50/50 border border-emerald-200 rounded text-xs text-emerald-800 leading-relaxed text-left">
+                        <span class="block font-bold mb-1 uppercase tracking-wider text-[10px]">Fleet Balanced</span>
+                        All monitored e-bike docking stations hold healthy occupancy levels. No immediate logistical action is requested.
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML += `
+                <div class="p-4 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800 space-y-2 text-left">
+                    <span class="block font-bold uppercase tracking-wider text-[10px]">Depletion Alerts</span>
+                    <p class="leading-relaxed">
+                        There are currently ${count} station nodes operating under critically low capacity. System rebalancing routing is recommended.
+                    </p>
+                    <button onclick="switchTab('operations')" class="font-semibold underline uppercase text-[10px] tracking-wider text-amber-900 block mt-1 hover:text-amber-950">
+                        View Routing Plans
+                    </button>
+                </div>
+            `;
+        }
+
+        // Render Dashboard Active Station table list
+        function renderDashboardStationsTable() {
+            const tbody = document.getElementById('dashboard-stations-tbody');
+            tbody.innerHTML = '';
+            
+            const isAdmin = currentUser && currentUser.role && currentUser.role.toUpperCase() === 'ADMIN';
+
+            globalStationsList.forEach(s => {
+                const occupancyPct = s.maxCapacity ? Math.round((s.currentBikes / s.maxCapacity) * 100) : 0;
+                let barColor = 'bg-zinc-900';
+                let stateLabel = 'Stable';
+                let textClass = 'text-zinc-900';
+                
+                if (occupancyPct < 20) {
+                    barColor = 'bg-red-500';
+                    stateLabel = 'Low Occupancy';
+                    textClass = 'text-red-600 font-medium';
+                } else if (occupancyPct >= 80) {
+                    barColor = 'bg-emerald-600';
+                    stateLabel = 'High Occupancy';
+                    textClass = 'text-emerald-700 font-medium';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="border-b border-zinc-100 hover:bg-zinc-50/50">
+                        <td class="py-3 px-2 font-medium text-zinc-900">${s.name}</td>
+                        <td class="py-3 px-2 flex flex-col justify-center">
+                            <span>${s.location}</span>
+                        </td>
+                        <td class="py-3 px-2">
+                            <div class="flex items-center gap-3">
+                                <span class="w-12 block truncate ${textClass}">${s.currentBikes} / ${s.maxCapacity}</span>
+                                <div class="w-24 bg-zinc-200 h-1.5 rounded-full overflow-hidden shrink-0">
+                                    <div class="${barColor} h-full" style="width: ${occupancyPct}%"></div>
+                                </div>
+                                <span class="text-[10px] text-zinc-400 uppercase tracking-wider">${stateLabel}</span>
+                            </div>
+                        </td>
+                        ${!isAdmin ? `
+                        <td class="py-3 px-2 text-right space-x-1.5">
+                            <button onclick="quickActionRent(${s.id})" class="px-2 py-1 text-[10px] border border-zinc-200 hover:bg-zinc-50 text-zinc-700 rounded font-medium transition-colors">
+                                Rent Bike
+                            </button>
+                            <button onclick="quickActionReturn(${s.id})" class="px-2 py-1 text-[10px] bg-zinc-900 hover:bg-zinc-800 text-white rounded font-medium transition-colors">
+                                Return Bike
+                            </button>
+                        </td>
+                        ` : ''}
+                    </tr>
+                `;
+            });
+        }
+
+        // Render managed stations list tab table
+        function renderStationsListTable() {
+            const tbody = document.getElementById('stations-list-tbody');
+            tbody.innerHTML = '';
+
+            const isAdmin = currentUser && currentUser.role && currentUser.role.toUpperCase() === 'ADMIN';
+
+            globalStationsList.forEach(s => {
+                const occupancyPct = s.maxCapacity ? Math.round((s.currentBikes / s.maxCapacity) * 100) : 0;
+                let badgeClass = 'bg-zinc-100 text-zinc-700 border-zinc-200';
+                let badgeLabel = 'Stable';
+
+                if (occupancyPct < 20) {
+                    badgeClass = 'bg-red-50 text-red-700 border-red-200';
+                    badgeLabel = 'Critical Depletion';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-zinc-50/50">
+                        <td class="py-3 px-4 font-mono text-zinc-400">NODE-${s.id}</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">${s.name}</td>
+                        <td class="py-3 px-4 text-zinc-500">${s.location}</td>
+                        <td class="py-3 px-4 font-medium font-mono text-zinc-900">${s.currentBikes} units</td>
+                        <td class="py-3 px-4 font-mono text-zinc-500">${s.maxCapacity} cap</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-block py-0.5 px-2 text-[10px] font-medium border rounded ${badgeClass}">${badgeLabel}</span>
+                        </td>
+                        ${isAdmin ? `
+                        <td class="py-3 px-4 text-right space-x-2">
+                            <button onclick="openStationModal(${s.id})" class="text-xs text-zinc-900 hover:underline">Edit Configuration</button>
+                            <button onclick="deleteStation(${s.id})" class="text-xs text-red-650 hover:underline">Delete Hub</button>
+                        </td>
+                        ` : ''}
+                    </tr>
+                `;
+            });
+        }
+
+        // Populate Location select tags in modals
+        function populateLocationDropdowns() {
+            const selectLocation = document.getElementById('vehicle-location-input');
+            if (selectLocation) {
+                selectLocation.innerHTML = '';
+                globalStationsList.forEach(s => {
+                    selectLocation.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+                });
+            }
+        }
+
+        // Render vehicle fleet directory
+        function renderVehiclesListTable() {
+            const tbody = document.getElementById('vehicles-list-tbody');
+            tbody.innerHTML = '';
+
+            const isAdmin = currentUser && currentUser.role && currentUser.role.toUpperCase() === 'ADMIN';
+
+            globalVehiclesList.forEach(v => {
+                let badgeClass = 'bg-zinc-100 text-zinc-700 border-zinc-200';
+                let dotClass = 'bg-zinc-400';
+                
+                if (v.status === 'AVAILABLE') {
+                    badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    dotClass = 'bg-emerald-500';
+                } else if (v.status === 'IN_USE') {
+                    badgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+                    dotClass = 'bg-blue-500';
+                } else if (v.status === 'MAINTENANCE') {
+                    badgeClass = 'bg-amber-50 text-amber-750 border-amber-200';
+                    dotClass = 'bg-amber-500';
+                }
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-zinc-50/50">
+                        <td class="py-3 px-4 font-mono text-zinc-500">#${v.id}</td>
+                        <td class="py-3 px-4 font-semibold text-zinc-900">${v.type === 'EBike' ? 'Propane Assisted E-Bike' : 'Standard Manual Cycle'}</td>
+                        <td class="py-3 px-4 font-medium text-zinc-700">${v.location}</td>
+                        <td class="py-3 px-4">
+                            <div class="flex items-center gap-1.5 font-mono">
+                                <span class="text-xs font-semibold">${v.batteryLevel}%</span>
+                                <div class="w-12 bg-zinc-200 h-1 rounded-full overflow-hidden">
+                                    <div class="h-full bg-zinc-700" style="width: ${v.batteryLevel}%"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 font-mono text-zinc-550">Rs. ${v.maintenanceCost || '0'}</td>
+                        <td class="py-3 px-4">
+                            <span class="inline-flex items-center gap-1.5 py-0.5 px-2 text-[10px] font-semibold border rounded-full ${badgeClass}">
+                                <span class="h-1.5 w-1.5 rounded-full ${dotClass}"></span>
+                                ${v.status}
+                            </span>
+                        </td>
+                        ${isAdmin ? `
+                        <td class="py-3 px-4 text-right space-x-2">
+                            <select onchange="updateVehicleStatus(${v.id}, this.value)" class="text-xs py-1 border border-zinc-200 rounded focus:outline-none">
+                                <option value="" disabled selected>Change State</option>
+                                <option value="AVAILABLE">Operational</option>
+                                <option value="IN_USE">Active Use</option>
+                                <option value="MAINTENANCE">Maintenance</option>
+                            </select>
+                            <button onclick="deleteVehicle(${v.id})" class="text-xs text-zinc-500 hover:text-zinc-800 hover:underline inline-block ml-2">Decomission</button>
+                        </td>
+                        ` : ''}
+                    </tr>
+                `;
+            });
+        }
+
+        // Render Rebalance Log rows/history cards (no emojis)
+        function renderRebalanceLogs() {
+            const container = document.getElementById('rebalance-logs-container');
+            container.innerHTML = '';
+
+            if (globalHistoryList.length === 0) {
+                container.innerHTML = `
+                    <div class="p-6 text-center text-xs text-zinc-400">
+                        No previous rebalancing logs have been recorded in this dispatcher shift.
+                    </div>
+                `;
+                return;
+            }
+
+            globalHistoryList.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).forEach(log => {
+                const dateFormatted = new Date(log.timestamp).toLocaleString();
+                container.innerHTML += `
+                    <div class="p-4 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 shadow-sm transition-all flex justify-between items-center text-xs">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-zinc-800 font-mono tracking-wider">${log.id}</span>
+                                <span class="text-[10px] text-zinc-400">${dateFormatted}</span>
+                            </div>
+                            <p class="font-medium text-zinc-700">Route Vector: ${log.routeTaken}</p>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="block font-semibold text-zinc-900">${log.stationsServiced} Hubs Replenished</span>
+                            <span class="block text-[10px] text-emerald-600 font-semibold font-mono">Saved ${log.fuelSaved}L Fuel</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        let activeRideInterval = null;
+
+        // Initialize and resume active ride state on startup or reload
+        function initOrResumeActiveRide() {
+            if (activeRideInterval) {
+                clearInterval(activeRideInterval);
+                activeRideInterval = null;
+            }
+            const savedRide = localStorage.getItem('activeRide');
+            if (savedRide) {
+                try {
+                    const activeRideObj = JSON.parse(savedRide);
+                    startActiveRideTimer(activeRideObj);
+                } catch (e) {
+                    console.error("Failed to parse saved active ride", e);
+                    localStorage.removeItem('activeRide');
+                }
+            } else {
+                const banner = document.getElementById('active-rental-container');
+                if (banner) banner.classList.add('hidden');
+            }
+        }
+
+        // Start active ride timer updates
+        function startActiveRideTimer(activeRide) {
+            if (activeRideInterval) clearInterval(activeRideInterval);
+
+            // Populate static UI labels
+            const lbl = document.getElementById('active-vehicle-label');
+            const orig = document.getElementById('active-origin-station');
+            const banner = document.getElementById('active-rental-container');
+            
+            if (lbl) lbl.textContent = `⚡ Rented ${activeRide.vehicleLabel}`;
+            if (orig) orig.textContent = activeRide.originStationName;
+            if (banner) banner.classList.remove('hidden');
+
+            // Quick drop-off dropdown update
+            populateReturnDropdown();
+
+            function updateUI() {
+                const elapsedSecs = Math.floor((Date.now() - activeRide.startTime) / 1000);
+                const hrs = Math.floor(elapsedSecs / 3600);
+                const mins = Math.floor((elapsedSecs % 3600) / 60);
+                const secs = elapsedSecs % 60;
+                
+                let durationText = "";
+                if (hrs > 0) {
+                    durationText = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                } else {
+                    durationText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                }
+                
+                const durEl = document.getElementById('active-ride-duration');
+                if (durEl) durEl.textContent = durationText;
+
+                // Slowly deplete battery over time (1% every 90 seconds of simulation ride)
+                const depletedAmt = Math.floor(elapsedSecs / 90);
+                const currentBattery = Math.max(5, activeRide.batteryLevel - depletedAmt);
+                
+                const batTxt = document.getElementById('active-battery-text');
+                const batBar = document.getElementById('active-battery-bar');
+                
+                if (batTxt) batTxt.textContent = `${currentBattery}%`;
+                if (batBar) {
+                    batBar.style.width = `${currentBattery}%`;
+                    if (currentBattery < 20) {
+                        batBar.className = "bg-red-500 h-full rounded-xs";
+                    } else if (currentBattery < 50) {
+                        batBar.className = "bg-amber-400 h-full rounded-xs";
+                    } else {
+                        batBar.className = "bg-emerald-400 h-full rounded-xs";
+                    }
+                }
+            }
+
+            updateUI();
+            activeRideInterval = setInterval(updateUI, 1000);
+        }
+
+        // Populate return dropdown destination select element
+        function populateReturnDropdown() {
+            const selectEl = document.getElementById('return-docking-select');
+            if (!selectEl) return;
+
+            selectEl.innerHTML = '';
+            
+            if (globalStationsList.length === 0) {
+                selectEl.innerHTML = '<option value="">No Stations Available</option>';
+                return;
+            }
+
+            globalStationsList.forEach(s => {
+                selectEl.innerHTML += `<option value="${s.id}">${s.name} (${s.currentBikes}/${s.maxCapacity} units docked)</option>`;
+            });
+        }
+
+        // Quick operation action: Rent
+        async function quickActionRent(stationId) {
+            if (localStorage.getItem('activeRide')) {
+                alert('Active Trip Lockout: You currently have an active rental session. Please return and dock your current ride first.');
+                return;
+            }
+
+            const station = globalStationsList.find(s => s.id === stationId);
+            if (!station) return;
+
+            if (station.currentBikes <= 0) {
+                alert('Error: There are no bikes available in this docking hub currently.');
+                return;
+            }
+
+            try {
+                // Try finding an available physical vehicle at this station
+                let bikeAsset = globalVehiclesList.find(v => v.status === 'AVAILABLE' && v.location === station.name);
+                
+                // If no pre-existing vehicle matches this location, register a mock on the fly to simulate real database tracking
+                if (!bikeAsset) {
+                    const battery = Math.floor(Math.random() * 21) + 75; // 75-95%
+                    const isManual = Math.random() > 0.7; // 30% standard manual cycle, 70% e-bike
+                    const type = isManual ? 'ManualBike' : 'EBike';
+                    
+                    const resCreate = await fetch('/api/vehicles', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: type,
+                            location: station.name,
+                            batteryLevel: battery,
+                            status: 'AVAILABLE'
+                        })
+                    });
+                    if (resCreate.ok) {
+                        bikeAsset = await resCreate.json();
+                    } else {
+                        // Fallback fallback virtual item
+                        bikeAsset = {
+                            id: 10 + Math.floor(Math.random() * 899),
+                            type: type,
+                            batteryLevel: battery,
+                            status: 'AVAILABLE',
+                            location: station.name
+                        };
+                    }
+                }
+
+                // Patch the vehicle state in database to "IN_USE" and move location "With User"
+                await fetch(`/api/vehicles/${bikeAsset.id}/status?status=IN_USE&location=With%20User&batteryLevel=${bikeAsset.batteryLevel}`, {
+                    method: 'PATCH'
+                });
+
+                // Decrement bike count from the station in the backend
+                const resRent = await fetch(`/api/stations/${stationId}/rent`, { method: 'POST' });
+                if (!resRent.ok) {
+                    throw new Error('Station rent decrement failure');
+                }
+
+                // Create and save active ride transaction
+                const activeRideObj = {
+                    vehicleId: bikeAsset.id,
+                    vehicleType: bikeAsset.type,
+                    vehicleLabel: `${bikeAsset.type === 'ManualBike' ? 'Standard Cycle' : 'Electric E-Bike'} #${bikeAsset.id}`,
+                    batteryLevel: bikeAsset.batteryLevel,
+                    originStationId: station.id,
+                    originStationName: station.name,
+                    startTime: Date.now()
+                };
+
+                localStorage.setItem('activeRide', JSON.stringify(activeRideObj));
+                
+                // Start timer
+                startActiveRideTimer(activeRideObj);
+                
+                // Refresh data
+                await fetchLatestData();
+
+            } catch (err) {
+                alert('Rental failed: ' + err.message);
+            }
+        }
+
+        // Quick operation action: Return/Dock Bike
+        async function quickActionReturn(stationId) {
+            const savedRide = localStorage.getItem('activeRide');
+            if (!savedRide) {
+                // Standard manual adjustment bypass for non-users or admins
+                const station = globalStationsList.find(s => s.id === stationId);
+                if (station && station.currentBikes >= station.maxCapacity) {
+                    alert('Station Lock: This docking station is completely full.');
+                    return;
+                }
+                // Issue Standard Incrementor
+                try {
+                    const res = await fetch(`/api/stations/${stationId}/return`, { method: 'POST' });
+                    if (!res.ok) throw new Error('Return failed');
+                    fetchLatestData();
+                } catch (err) {
+                    alert(err.message);
+                }
+                return;
+            }
+
+            // Normal renter flow: Return current active ride to this station row
+            const selectEl = document.getElementById('return-docking-select');
+            if (selectEl) {
+                selectEl.value = stationId;
+            }
+            terminateActiveRentalTrip();
+        }
+
+        // Terminate ACTIVE Rental session trip
+        async function terminateActiveRentalTrip() {
+            const savedRide = localStorage.getItem('activeRide');
+            if (!savedRide) return;
+
+            const activeRideObj = JSON.parse(savedRide);
+            const selectEl = document.getElementById('return-docking-select');
+            if (!selectEl) return;
+            
+            const targetStationId = Number(selectEl.value);
+            const station = globalStationsList.find(s => s.id === targetStationId);
+            if (!station) {
+                alert('Please select a valid destination station to return.');
+                return;
+            }
+
+            if (station.currentBikes >= station.maxCapacity) {
+                alert(`Operations Block: ${station.name} is at maximum capacity (${station.maxCapacity}/${station.maxCapacity} slots filled). Please choose another return hub.`);
+                return;
+            }
+
+            try {
+                // Calculate flight simulation battery depletion stats
+                const elapsedSecs = Math.floor((Date.now() - activeRideObj.startTime) / 1000);
+                const durationMins = elapsedSecs / 60;
+                
+                // Base depletion is 5%, plus about 1% for every 1.5 minutes of simulation duration
+                const depletion = Math.max(4, Math.min(65, Math.round(durationMins * 0.7) + Math.floor(Math.random() * 5 + 3)));
+                const finalBattery = Math.max(5, activeRideObj.batteryLevel - depletion);
+
+                // If battery drops below 20%, flag the unit for MAINTENANCE automatically!
+                const finalStatus = finalBattery < 20 ? 'MAINTENANCE' : 'AVAILABLE';
+
+                // Patch vehicle location is now station name they returned to, battery level gets updated
+                await fetch(`/api/vehicles/${activeRideObj.vehicleId}/status?status=${finalStatus}&location=${encodeURIComponent(station.name)}&batteryLevel=${finalBattery}`, {
+                    method: 'PATCH'
+                });
+
+                // Call return endpoint in controller to increment station's bikes
+                const res = await fetch(`/api/stations/${targetStationId}/return`, { method: 'POST' });
+                if (!res.ok) throw new Error('Return transaction rejected');
+
+                // Generate and record Completed Trip Ticket in Local Cache History
+                const elapsedMins = Math.floor(elapsedSecs / 60);
+                const elapsedSecsLeft = elapsedSecs % 60;
+                const durationString = elapsedMins > 0 ? `${elapsedMins}m ${elapsedSecsLeft}s` : `${elapsedSecsLeft}s`;
+
+                // Fare pricing logic: Rs. 60 base flat, Rs. 15 per minute started
+                const fareValue = activeRideObj.vehicleType === 'ManualBike' 
+                    ? Math.round(30 + durationMins * 8) 
+                    : Math.round(65 + durationMins * 16);
+
+                const completedTripObj = {
+                    id: `TXID-${10000 + Math.floor(Math.random() * 89999)}`,
+                    origin: activeRideObj.originStationName,
+                    destination: station.name,
+                    vehicleLabel: activeRideObj.vehicleLabel,
+                    duration: durationString,
+                    fare: fareValue,
+                    endTime: Date.now()
+                };
+
+                // Retrieve and append to personal renter history list
+                const historyStr = localStorage.getItem('renterTripHistory');
+                let tripHistoryAry = [];
+                if (historyStr) {
+                    try { tripHistoryAry = JSON.parse(historyStr); } catch (_) {}
+                }
+                tripHistoryAry.push(completedTripObj);
+                localStorage.setItem('renterTripHistory', JSON.stringify(tripHistoryAry));
+
+                // Clear live timer
+                if (activeRideInterval) {
+                    clearInterval(activeRideInterval);
+                    activeRideInterval = null;
+                }
+                localStorage.removeItem('activeRide');
+
+                // Hide banner
+                const banner = document.getElementById('active-rental-container');
+                if (banner) banner.classList.add('hidden');
+
+                // Launch Receipt ticket dialog modal
+                document.getElementById('receipt-id').textContent = completedTripObj.id;
+                document.getElementById('receipt-bike-label').textContent = completedTripObj.vehicleLabel;
+                document.getElementById('receipt-origin').textContent = completedTripObj.origin;
+                document.getElementById('receipt-dropoff').textContent = completedTripObj.destination;
+                document.getElementById('receipt-duration').textContent = completedTripObj.duration;
+                document.getElementById('receipt-amount').textContent = `Rs. ${completedTripObj.fare}`;
+                document.getElementById('receipt-battery-depleted').textContent = `${depletion}%`;
+                
+                document.getElementById('receipt-modal').classList.remove('hidden');
+
+                // Refresh everything
+                await fetchLatestData();
+
+            } catch (e) {
+                alert('Failure returning: ' + e.message);
+            }
+        }
+
+        // Close transaction summary dialog box
+        function closeReceiptModal() {
+            document.getElementById('receipt-modal').classList.add('hidden');
+        }
+
+        // Trigger Auto Rebalance algorithm
+        async function triggerRebalancingRoutine() {
+            try {
+                const res = await fetch('/api/rebalance/trigger', { method: 'POST' });
+                const message = await res.text();
+                fetchLatestData();
+                alert(message);
+            } catch (err) {
+                alert('Trigger rebalance operational failure: ' + err.message);
+            }
+        }
+
+        // Delete station node
+        async function deleteStation(id) {
+            if (!confirm('Are you absolutely certain you want to decommission this docking station node from VeloOps control?')) return;
+            try {
+                const res = await fetch(`/api/stations/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                fetchLatestData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Delete vehicle registered asset
+        async function deleteVehicle(id) {
+            if (!confirm('Decommission and remove this vehicle asset permanently from fleet tracking?')) return;
+            try {
+                const res = await fetch(`/api/vehicles/${id}`, { method: 'DELETE' });
+                fetchLatestData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Patch Vehicle Status Operational dropdown state
+        async function updateVehicleStatus(id, newStatus) {
+            try {
+                const res = await fetch(`/api/vehicles/${id}/status?status=${newStatus}`, { method: 'PATCH' });
+                fetchLatestData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Modals management trigger operations
+        function openStationModal(stationId = null) {
+            const form = document.getElementById('station-modal-form');
+            form.reset();
+
+            if (stationId) {
+                document.getElementById('station-modal-title').textContent = 'Configure Station Node';
+                const station = globalStationsList.find(s => s.id === stationId);
+                if (station) {
+                    document.getElementById('station-id').value = station.id;
+                    document.getElementById('station-name-input').value = station.name;
+                    document.getElementById('station-location-input').value = station.location;
+                    document.getElementById('station-current-bikes-input').value = station.currentBikes;
+                    document.getElementById('station-capacity-input').value = station.maxCapacity;
+                }
+            } else {
+                document.getElementById('station-modal-title').textContent = 'Create Station Node';
+                document.getElementById('station-id').value = '';
+                document.getElementById('station-current-bikes-input').value = '5';
+                document.getElementById('station-capacity-input').value = '15';
+            }
+            document.getElementById('station-modal').classList.remove('hidden');
+        }
+
+        function closeStationModal() {
+            document.getElementById('station-modal').classList.add('hidden');
+        }
+
+        async function submitStationForm(e) {
+            e.preventDefault();
+            const id = document.getElementById('station-id').value;
+            const name = document.getElementById('station-name-input').value;
+            const location = document.getElementById('station-location-input').value;
+            const currentBikes = parseInt(document.getElementById('station-current-bikes-input').value);
+            const maxCapacity = parseInt(document.getElementById('station-capacity-input').value);
+
+            const body = { name, location, currentBikes, maxCapacity };
+            const endpoint = id ? `/api/stations/${id}` : '/api/stations';
+            const method = id ? 'PUT' : 'POST';
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                
+                if (!res.ok) throw new Error('Action failed');
+                closeStationModal();
+                fetchLatestData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function openVehicleModal() {
+            document.getElementById('vehicle-modal-form').reset();
+            document.getElementById('vehicle-modal').classList.remove('hidden');
+        }
+
+        function closeVehicleModal() {
+            document.getElementById('vehicle-modal').classList.add('hidden');
+        }
+
+        async function submitVehicleForm(e) {
+            e.preventDefault();
+            const type = document.getElementById('vehicle-type-input').value;
+            const location = document.getElementById('vehicle-location-input').value;
+            const batteryLevel = parseInt(document.getElementById('vehicle-battery-input').value);
+            const status = document.getElementById('vehicle-status-input').value;
+
+            const body = { type, location, batteryLevel, status };
+            try {
+                const res = await fetch('/api/vehicles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) throw new Error('Deploment registration failed');
+                closeVehicleModal();
+                fetchLatestData();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+
+        // Analytics View Chart.js generation algorithms
+        function renderAnalyticsCharts() {
+            // Wait for Chart JS load, then configure canvases
+            const canvasOcc = document.getElementById('chart-occupancy');
+            const canvasVeh = document.getElementById('chart-vehicles');
+
+            if (!canvasOcc || !canvasVeh) return;
+
+            // Destroy previous instances to prevent rendering ghosts
+            if (occupancyChartInstance) occupancyChartInstance.destroy();
+            if (vehiclesChartInstance) vehiclesChartInstance.destroy();
+
+            const labels = globalStationsList.map(s => s.name);
+            const counts = globalStationsList.map(s => s.currentBikes);
+            const caps = globalStationsList.map(s => s.maxCapacity);
+
+            occupancyChartInstance = new Chart(canvasOcc, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Current Docked Bikes',
+                            data: counts,
+                            backgroundColor: '#27272a',
+                            borderColor: '#18181b',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Maximum Capacity Target',
+                            data: caps,
+                            backgroundColor: '#e4e4e7',
+                            borderColor: '#d4d4d8',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { font: { size: 10 } }
+                        },
+                        x: {
+                            ticks: { font: { size: 10 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+
+            // Pie distributions status chart
+            const states = { AVAILABLE: 0, IN_USE: 0, MAINTENANCE: 0 };
+            globalVehiclesList.forEach(v => {
+                if (states[v.status] !== undefined) states[v.status]++;
+            });
+
+            vehiclesChartInstance = new Chart(canvasVeh, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Operational Availability', 'Active Rides', 'Refurbishment Status'],
+                    datasets: [{
+                        data: [states.AVAILABLE, states.IN_USE, states.MAINTENANCE],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+
+
+    </script>
+</body>
+</html>

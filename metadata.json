@@ -1,0 +1,8 @@
+{
+  "name": "VeloOps",
+  "description": "A minimal, clean e-bike fleet operations dashboard with live status reporting and route rebalancing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
